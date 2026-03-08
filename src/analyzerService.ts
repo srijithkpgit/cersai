@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { WarningRow, AnalysisResult, ProgressCallback, ResultCallback, DefensivenessLevel, ProjectContext } from './types';
+import { WarningRow, AnalysisResult, ProgressCallback, ResultCallback, DefensivenessLevel, ProjectContext, ColumnMapping } from './types';
 import { readWarnings, writeResult } from './excelService';
 import { getCodeContext, findRelatedDefinitions, clearFileCache } from './codeContextService';
 import { analyzeWarning, challengeAnalysis } from './aiService';
@@ -29,11 +29,12 @@ export async function runAnalysis(
   selectedRows: Set<number> | undefined,
   reviewFixes: boolean,
   verifyResults: boolean,
+  columnMapping: ColumnMapping | undefined,
   onProgress: ProgressCallback,
   onResult: ResultCallback,
   cancellationToken: vscode.CancellationToken
 ): Promise<AnalysisSummary> {
-  const allWarnings = await readWarnings(excelPath);
+  const allWarnings = await readWarnings(excelPath, columnMapping);
 
   let filtered = allWarnings;
   if (selectedRows && selectedRows.size > 0) {
@@ -140,7 +141,7 @@ export async function runAnalysis(
       }
 
       // Step 5: Write result to Excel (serialized via queue)
-      enqueueWrite(() => writeResult(excelPath, warning.rowNumber, result));
+      enqueueWrite(() => writeResult(excelPath, warning.rowNumber, result, columnMapping));
 
       // Update summary
       summary.analyzed++;

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ColumnMapping } from './types';
 
 export interface ProjectConfig {
   excelPath?: string;
@@ -15,6 +16,7 @@ export interface ProjectConfig {
   reviewFixes?: boolean;
   skipAnalyzed?: boolean;
   manualSelect?: boolean;
+  columnMapping?: ColumnMapping;
 }
 
 const CONFIG_FILENAME = '.certc-analyzer.json';

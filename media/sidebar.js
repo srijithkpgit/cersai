@@ -5,6 +5,7 @@
   // State
   let excelPath = '';
   let folderPath = '';
+  let savedColumnMapping = null;
 
   // Elements
   const excelPathEl = document.getElementById('excelPath');
@@ -31,6 +32,79 @@
   const projectNotesInput = document.getElementById('projectNotesInput');
   const exportSection = document.getElementById('exportSection');
   const btnExport = document.getElementById('btnExport');
+
+  // Column mapping elements
+  const columnMappingSection = document.getElementById('columnMappingSection');
+  const mapMessage = document.getElementById('mapMessage');
+  const mapPath = document.getElementById('mapPath');
+  const mapLineInCode = document.getElementById('mapLineInCode');
+  const mapColumn = document.getElementById('mapColumn');
+  const mapCodeLine = document.getElementById('mapCodeLine');
+  const mappingSelects = [mapMessage, mapPath, mapLineInCode, mapColumn, mapCodeLine];
+
+  // Synonym map for auto-detection
+  const synonyms = {
+    message: ['message', 'warning', 'description', 'msg', 'rule', 'diagnostic'],
+    path: ['path', 'file', 'filepath', 'file path', 'filename', 'file name', 'source', 'source file'],
+    lineInCode: ['line-in-code', 'line', 'lineincode', 'linenumber', 'line number', 'line_number', 'lineno', 'line no'],
+    column: ['column', 'col', 'columnno', 'column number', 'col_number'],
+    codeLine: ['code-line', 'code', 'codeline', 'code line', 'source line', 'sourceline', 'source_line', 'code_line'],
+  };
+
+  function getColumnMapping() {
+    const m = mapMessage.value;
+    const p = mapPath.value;
+    const l = mapLineInCode.value;
+    const c = mapColumn.value;
+    const cl = mapCodeLine.value;
+    if (m && p && l && c && cl) {
+      return { message: m, path: p, lineInCode: l, column: c, codeLine: cl };
+    }
+    return null;
+  }
+
+  function populateDropdowns(headers, savedMapping) {
+    mappingSelects.forEach(sel => {
+      const current = sel.value;
+      sel.innerHTML = '<option value="">-- select column --</option>';
+      headers.forEach(h => {
+        const opt = document.createElement('option');
+        opt.value = h;
+        opt.textContent = h;
+        sel.appendChild(opt);
+      });
+      // Restore previous selection if still valid
+      if (current && headers.includes(current)) {
+        sel.value = current;
+      }
+    });
+
+    // Auto-detect or restore saved mapping
+    const fieldMap = { message: mapMessage, path: mapPath, lineInCode: mapLineInCode, column: mapColumn, codeLine: mapCodeLine };
+    const headersLower = headers.map(h => h.toLowerCase());
+
+    for (const [field, selectEl] of Object.entries(fieldMap)) {
+      // If saved mapping has a value for this field and it exists in headers, use it
+      if (savedMapping && savedMapping[field] && headers.some(h => h.toLowerCase() === savedMapping[field].toLowerCase())) {
+        const match = headers.find(h => h.toLowerCase() === savedMapping[field].toLowerCase());
+        selectEl.value = match;
+        continue;
+      }
+      // Otherwise auto-detect
+      if (!selectEl.value) {
+        const syns = synonyms[field] || [];
+        for (const syn of syns) {
+          const idx = headersLower.indexOf(syn);
+          if (idx !== -1) {
+            selectEl.value = headers[idx];
+            break;
+          }
+        }
+      }
+    }
+
+    columnMappingSection.classList.add('visible');
+  }
 
   // Show/hide review fixes sub-option based on auto-fix checkbox
   autoFixCheckbox.addEventListener('change', () => {
@@ -62,6 +136,7 @@
       skipAnalyzed: skipAnalyzedCheckbox.checked,
       manualSelect: manualSelectCheckbox.checked,
       reviewFixes: reviewFixesCheckbox.checked,
+      columnMapping: getColumnMapping(),
     });
   });
 
@@ -153,6 +228,11 @@
         updateStartButton();
         break;
 
+      case 'excelHeaders':
+        populateDropdowns(msg.headers, savedColumnMapping);
+        savedColumnMapping = null;
+        break;
+
       case 'statusWarning':
         addLogEntry('WARN', 'error', msg.message, '-');
         break;
@@ -195,6 +275,7 @@
         skipAnalyzedCheckbox.disabled = true;
         manualSelectCheckbox.disabled = true;
         reviewFixesCheckbox.disabled = true;
+        mappingSelects.forEach(s => s.disabled = true);
 
         exportSection.style.display = 'none';
         progressSection.style.display = 'flex';
@@ -250,6 +331,7 @@
         skipAnalyzedCheckbox.disabled = false;
         manualSelectCheckbox.disabled = false;
         reviewFixesCheckbox.disabled = false;
+        mappingSelects.forEach(s => s.disabled = false);
 
         progressBar.style.width = '100%';
         progressText.textContent = msg.summary.cancelled
@@ -285,6 +367,7 @@
         skipAnalyzedCheckbox.disabled = false;
         manualSelectCheckbox.disabled = false;
         reviewFixesCheckbox.disabled = false;
+        mappingSelects.forEach(s => s.disabled = false);
 
         progressText.textContent = 'Error: ' + msg.error;
         break;
@@ -319,6 +402,7 @@
           if (c.projectNotes !== undefined) { projectNotesInput.value = c.projectNotes; }
           if (c.reviewFixes !== undefined) { reviewFixesCheckbox.checked = c.reviewFixes; }
           if (c.skipAnalyzed !== undefined) { skipAnalyzedCheckbox.checked = c.skipAnalyzed; }
+          if (c.columnMapping) { savedColumnMapping = c.columnMapping; }
           updateStartButton();
         }
         break;
@@ -340,6 +424,7 @@
             skipAnalyzed: skipAnalyzedCheckbox.checked,
             manualSelect: manualSelectCheckbox.checked,
             reviewFixes: reviewFixesCheckbox.checked,
+            columnMapping: getColumnMapping(),
           });
         }
         break;

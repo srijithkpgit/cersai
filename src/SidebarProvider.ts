@@ -3,8 +3,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { runAnalysis, AnalysisSummary } from './analyzerService';
 import { resetModelCache, checkAiAvailability, estimateTokens } from './aiService';
-import { readWarnings } from './excelService';
-import { WarningRow, ProjectContext } from './types';
+import { readWarnings, readHeaders } from './excelService';
+import { WarningRow, ProjectContext, ColumnMapping } from './types';
 import { generateHtmlReport } from './reportService';
 import { addDiagnostic, clearDiagnostics } from './diagnosticsService';
 import { loadConfig, saveConfig, ProjectConfig } from './configService';
@@ -54,10 +54,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             safetyStandard: message.safetyStandard || '',
             projectNotes: message.projectNotes || '',
           };
+          const colMapping: ColumnMapping | undefined = (message.columnMapping?.message && message.columnMapping?.path)
+            ? message.columnMapping as ColumnMapping
+            : undefined;
           if (message.manualSelect) {
-            await this._startWithManualSelection(message.excelPath, message.projectFolder, message.defensiveness, ctx, message.autoFix, message.skipAnalyzed, message.reviewFixes);
+            await this._startWithManualSelection(message.excelPath, message.projectFolder, message.defensiveness, ctx, message.autoFix, message.skipAnalyzed, message.reviewFixes, colMapping);
           } else {
-            await this._startAnalysis(message.excelPath, message.projectFolder, message.defensiveness, ctx, message.autoFix, message.skipAnalyzed, undefined, message.reviewFixes);
+            await this._startAnalysis(message.excelPath, message.projectFolder, message.defensiveness, ctx, message.autoFix, message.skipAnalyzed, undefined, message.reviewFixes, colMapping);
           }
           break;
         }
@@ -133,10 +136,22 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     });
 
     if (result && result[0]) {
+      const filePath = result[0].fsPath;
       this._view?.webview.postMessage({
         command: 'excelSelected',
-        path: result[0].fsPath,
+        path: filePath,
       });
+
+      // Read headers and send to webview for column mapping
+      try {
+        const headers = await readHeaders(filePath);
+        this._view?.webview.postMessage({
+          command: 'excelHeaders',
+          headers,
+        });
+      } catch {
+        // Silently ignore — validation will catch issues later
+      }
     }
   }
 
@@ -161,7 +176,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     vscode.window.showErrorMessage(error);
   }
 
-  private async _startAnalysis(excelPath: string, projectFolder: string, defensiveness?: string, projectContext?: ProjectContext, autoFix?: boolean, skipAnalyzed?: boolean, selectedRows?: Set<number>, reviewFixes?: boolean): Promise<void> {
+  private async _startAnalysis(excelPath: string, projectFolder: string, defensiveness?: string, projectContext?: ProjectContext, autoFix?: boolean, skipAnalyzed?: boolean, selectedRows?: Set<number>, reviewFixes?: boolean, columnMapping?: ColumnMapping): Promise<void> {
     if (this._isRunning) {
       vscode.window.showWarningMessage('Analysis is already running.');
       return;
@@ -201,7 +216,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ command: 'validating', message: 'Checking Excel format...' });
     let warningCount = 0;
     try {
-      const warnings = await readWarnings(excelPath);
+      const warnings = await readWarnings(excelPath, columnMapping);
       warningCount = warnings.length;
       if (warningCount === 0) {
         this._sendError(
@@ -253,6 +268,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       autoFix: !!autoFix,
       reviewFixes: !!reviewFixes,
       skipAnalyzed: skipAnalyzed !== false,
+      columnMapping,
     });
 
     // --- All checks passed, start analysis ---
@@ -262,7 +278,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     // Store warnings for result callback to reference file paths
     let warningsForResults: WarningRow[] = [];
     try {
-      warningsForResults = await readWarnings(excelPath);
+      warningsForResults = await readWarnings(excelPath, columnMapping);
     } catch { /* already validated above */ }
 
     this._view?.webview.postMessage({ command: 'analysisStarted', warningCount });
@@ -294,6 +310,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         selectedRows,
         doReviewFixes,
         true, // Always verify non-critical results with challenger pass
+        columnMapping,
         // Progress callback
         (current, total, message) => {
           this._view?.webview.postMessage({
@@ -413,7 +430,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     projectContext?: ProjectContext,
     autoFix?: boolean,
     skipAnalyzed?: boolean,
-    reviewFixes?: boolean
+    reviewFixes?: boolean,
+    columnMapping?: ColumnMapping
   ): Promise<void> {
     if (!excelPath) {
       this._sendError('Please select an Excel file first.');
@@ -422,7 +440,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     let warnings: WarningRow[];
     try {
-      warnings = await readWarnings(excelPath);
+      warnings = await readWarnings(excelPath, columnMapping);
     } catch (err) {
       this._sendError(`Excel read error: ${err instanceof Error ? err.message : String(err)}`);
       return;
@@ -487,7 +505,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    await this._startAnalysis(excelPath, projectFolder, defensiveness, projectContext, autoFix, skipAnalyzed, matchingRows, reviewFixes);
+    await this._startAnalysis(excelPath, projectFolder, defensiveness, projectContext, autoFix, skipAnalyzed, matchingRows, reviewFixes, columnMapping);
   }
 
   private async _reviewPendingFixes(projectRoot: string, excelPath: string): Promise<void> {
@@ -613,10 +631,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private _loadAndSendConfig(): void {
+  private async _loadAndSendConfig(): Promise<void> {
     const config = loadConfig();
     if (config) {
       this._view?.webview.postMessage({ command: 'configLoaded', config });
+
+      // Also send headers if Excel path is saved so mapping dropdowns can be populated
+      if (config.excelPath && fs.existsSync(config.excelPath)) {
+        try {
+          const headers = await readHeaders(config.excelPath);
+          this._view?.webview.postMessage({ command: 'excelHeaders', headers });
+        } catch { /* ignore */ }
+      }
     }
   }
 
@@ -672,6 +698,31 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           <span id="folderPath" class="file-path">No folder selected</span>
           <button id="btnSelectFolder" class="btn btn-secondary">Browse</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Column Mapping -->
+    <div id="columnMappingSection" class="section column-mapping">
+      <div class="section-title">Column Mapping</div>
+      <div class="mapping-field">
+        <span class="mapping-label">Message</span>
+        <select id="mapMessage" class="select-input"><option value="">-- select column --</option></select>
+      </div>
+      <div class="mapping-field">
+        <span class="mapping-label">File Path</span>
+        <select id="mapPath" class="select-input"><option value="">-- select column --</option></select>
+      </div>
+      <div class="mapping-field">
+        <span class="mapping-label">Line</span>
+        <select id="mapLineInCode" class="select-input"><option value="">-- select column --</option></select>
+      </div>
+      <div class="mapping-field">
+        <span class="mapping-label">Column</span>
+        <select id="mapColumn" class="select-input"><option value="">-- select column --</option></select>
+      </div>
+      <div class="mapping-field">
+        <span class="mapping-label">Code Line</span>
+        <select id="mapCodeLine" class="select-input"><option value="">-- select column --</option></select>
       </div>
     </div>
 

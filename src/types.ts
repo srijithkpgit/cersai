@@ -26,5 +26,13 @@ export interface ProjectContext {
   projectNotes: string;
 }
 
+export interface ColumnMapping {
+  message: string;
+  path: string;
+  lineInCode: string;
+  column: string;
+  codeLine: string;
+}
+
 export type ProgressCallback = (current: number, total: number, message: string) => void;
 export type ResultCallback = (rowNumber: number, result: AnalysisResult | null, error?: string) => void;

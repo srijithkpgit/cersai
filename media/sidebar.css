@@ -101,6 +101,58 @@ body {
   cursor: not-allowed;
 }
 
+/* ── Select dropdowns ── */
+.select-input {
+  font-size: 11px;
+  color: var(--vscode-input-foreground, var(--vscode-foreground));
+  padding: 4px 6px;
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 4px;
+  min-height: 26px;
+  font-family: var(--vscode-font-family);
+  width: 100%;
+  outline: none;
+  cursor: pointer;
+}
+
+.select-input:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.select-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Column mapping ── */
+.column-mapping {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.column-mapping.visible {
+  display: flex;
+}
+
+.mapping-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mapping-label {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  min-width: 70px;
+  flex-shrink: 0;
+}
+
+.mapping-field .select-input {
+  flex: 1;
+}
+
 .text-area {
   resize: vertical;
   min-height: 48px;

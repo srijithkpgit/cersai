@@ -1,7 +1,5 @@
 import ExcelJS from 'exceljs';
-import { WarningRow, AnalysisResult } from './types';
-
-const REQUIRED_HEADERS = ['Message', 'Path', 'Line-in-Code', 'Column', 'Code-Line'] as const;
+import { WarningRow, AnalysisResult, ColumnMapping } from './types';
 
 interface ColumnMap {
   message: number;
@@ -14,31 +12,60 @@ interface ColumnMap {
   fixApplied: number;
 }
 
-function buildColumnMap(worksheet: ExcelJS.Worksheet): ColumnMap {
+export async function readHeaders(filePath: string): Promise<string[]> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(filePath);
+  const worksheet = workbook.getWorksheet(1);
+  if (!worksheet) { return []; }
+
+  const headers: string[] = [];
+  const headerRow = worksheet.getRow(1);
+  headerRow.eachCell((cell) => {
+    const val = String(cell.value ?? '').trim();
+    if (val) { headers.push(val); }
+  });
+  return headers;
+}
+
+function buildColumnMap(worksheet: ExcelJS.Worksheet, mapping?: ColumnMapping): ColumnMap {
   const headerRow = worksheet.getRow(1);
   const map: Partial<ColumnMap> = {};
 
+  // Build a lookup: lowercase header name → column number
+  const headerIndex = new Map<string, number>();
   headerRow.eachCell((cell, colNumber) => {
-    const header = String(cell.value).trim().toLowerCase();
-    switch (header) {
-      case 'message': map.message = colNumber; break;
-      case 'path': map.path = colNumber; break;
-      case 'line-in-code': map.lineInCode = colNumber; break;
-      case 'column': map.column = colNumber; break;
-      case 'code-line': map.codeLine = colNumber; break;
-      case 'comment': map.comment = colNumber; break;
-      case 'priority': map.priority = colNumber; break;
-      case 'fixapplied': map.fixApplied = colNumber; break;
-    }
+    const header = String(cell.value).trim();
+    headerIndex.set(header.toLowerCase(), colNumber);
   });
+
+  if (mapping) {
+    // Use user-provided mapping
+    map.message = headerIndex.get(mapping.message.toLowerCase());
+    map.path = headerIndex.get(mapping.path.toLowerCase());
+    map.lineInCode = headerIndex.get(mapping.lineInCode.toLowerCase());
+    map.column = headerIndex.get(mapping.column.toLowerCase());
+    map.codeLine = headerIndex.get(mapping.codeLine.toLowerCase());
+  } else {
+    // Fallback: match by hardcoded names
+    map.message = headerIndex.get('message');
+    map.path = headerIndex.get('path');
+    map.lineInCode = headerIndex.get('line-in-code');
+    map.column = headerIndex.get('column');
+    map.codeLine = headerIndex.get('code-line');
+  }
+
+  // Always detect output columns by name
+  map.comment = headerIndex.get('comment');
+  map.priority = headerIndex.get('priority');
+  map.fixApplied = headerIndex.get('fixapplied');
 
   // Validate required columns
   const missing: string[] = [];
-  if (!map.message) { missing.push('Message'); }
-  if (!map.path) { missing.push('Path'); }
-  if (!map.lineInCode) { missing.push('Line-in-Code'); }
-  if (!map.column) { missing.push('Column'); }
-  if (!map.codeLine) { missing.push('Code-Line'); }
+  if (!map.message) { missing.push(mapping?.message || 'Message'); }
+  if (!map.path) { missing.push(mapping?.path || 'Path'); }
+  if (!map.lineInCode) { missing.push(mapping?.lineInCode || 'Line-in-Code'); }
+  if (!map.column) { missing.push(mapping?.column || 'Column'); }
+  if (!map.codeLine) { missing.push(mapping?.codeLine || 'Code-Line'); }
 
   if (missing.length > 0) {
     throw new Error(`Missing required columns in Excel: ${missing.join(', ')}`);
@@ -68,7 +95,7 @@ function buildColumnMap(worksheet: ExcelJS.Worksheet): ColumnMap {
   return map as ColumnMap;
 }
 
-export async function readWarnings(filePath: string): Promise<WarningRow[]> {
+export async function readWarnings(filePath: string, columnMapping?: ColumnMapping): Promise<WarningRow[]> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(filePath);
 
@@ -77,7 +104,7 @@ export async function readWarnings(filePath: string): Promise<WarningRow[]> {
     throw new Error('No worksheet found in Excel file');
   }
 
-  const colMap = buildColumnMap(worksheet);
+  const colMap = buildColumnMap(worksheet, columnMapping);
   const warnings: WarningRow[] = [];
 
   worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
@@ -103,7 +130,8 @@ export async function readWarnings(filePath: string): Promise<WarningRow[]> {
 export async function writeResult(
   filePath: string,
   rowNumber: number,
-  result: AnalysisResult
+  result: AnalysisResult,
+  columnMapping?: ColumnMapping
 ): Promise<void> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(filePath);
@@ -113,7 +141,7 @@ export async function writeResult(
     throw new Error('No worksheet found in Excel file');
   }
 
-  const colMap = buildColumnMap(worksheet);
+  const colMap = buildColumnMap(worksheet, columnMapping);
   const row = worksheet.getRow(rowNumber);
 
   row.getCell(colMap.priority).value = result.priority;

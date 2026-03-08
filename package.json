@@ -38,10 +38,6 @@
     "url": "https://github.com/srijithkpgit/cersai/issues"
   },
   "homepage": "https://github.com/srijithkpgit/cersai#readme",
-  "extensionDependencies": [
-    "GitHub.copilot-chat"
-  ],
-  "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {

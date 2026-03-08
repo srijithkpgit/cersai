@@ -33,7 +33,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, 'media')],
+      localResourceRoots: [this._extensionUri],
     };
 
     webviewView.webview.html = this._getHtmlContent(webviewView.webview);
@@ -84,7 +84,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     // Load config and run initial status check when sidebar loads
     this._runInitialStatusCheck().catch(() => {});
-    this._loadAndSendConfig();
+    this._loadAndSendConfig().catch(() => {});
   }
 
   private async _runInitialStatusCheck(): Promise<void> {
@@ -690,7 +690,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
   <link href="${cssUri}" rel="stylesheet">
   <title>Cersai</title>
 </head>

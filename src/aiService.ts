@@ -79,7 +79,8 @@ let cachedModel: vscode.LanguageModelChat | null = null;
  */
 export async function checkAiAvailability(): Promise<string | null> {
   // First do a quick check: is the Copilot extension even installed?
-  const copilotExt = vscode.extensions.getExtension('GitHub.copilot');
+  const copilotExt = vscode.extensions.getExtension('GitHub.copilot')
+    || vscode.extensions.getExtension('GitHub.copilot-chat');
   if (!copilotExt) {
     return 'GitHub Copilot extension is not installed.\n\nTo fix this:\n1. Open Extensions panel (Ctrl+Shift+X / Cmd+Shift+X)\n2. Search for "GitHub Copilot"\n3. Install it and sign in with your GitHub account';
   }
@@ -119,7 +120,8 @@ async function getModel(): Promise<vscode.LanguageModelChat> {
   const models = await vscode.lm.selectChatModels({ vendor: 'copilot' });
 
   if (!models || models.length === 0) {
-    const copilotExt = vscode.extensions.getExtension('GitHub.copilot');
+    const copilotExt = vscode.extensions.getExtension('GitHub.copilot')
+      || vscode.extensions.getExtension('GitHub.copilot-chat');
     if (!copilotExt) {
       throw new Error(
         'GitHub Copilot extension is not installed.\n\n' +

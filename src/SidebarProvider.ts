@@ -93,8 +93,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     const issues: string[] = [];
 
-    // Check Copilot extension
-    const copilotExt = vscode.extensions.getExtension('GitHub.copilot');
+    // Check Copilot extension (GitHub unified copilot + copilot-chat into one)
+    const copilotExt = vscode.extensions.getExtension('GitHub.copilot')
+      || vscode.extensions.getExtension('GitHub.copilot-chat');
     if (!copilotExt) {
       issues.push('GitHub Copilot extension is not installed. Install it from the Extensions panel.');
     }

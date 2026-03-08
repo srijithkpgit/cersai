@@ -176,6 +176,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     vscode.window.showErrorMessage(error);
   }
 
+  private async _ensureWorkspaceFolder(folderPath: string): Promise<void> {
+    const folderUri = vscode.Uri.file(folderPath);
+    const folders = vscode.workspace.workspaceFolders ?? [];
+
+    // Check if already in workspace
+    const alreadyOpen = folders.some(f => f.uri.fsPath === folderUri.fsPath);
+    if (alreadyOpen) { return; }
+
+    // Add to workspace — non-destructive, keeps existing folders
+    vscode.workspace.updateWorkspaceFolders(folders.length, 0, { uri: folderUri });
+  }
+
   private async _startAnalysis(excelPath: string, projectFolder: string, defensiveness?: string, projectContext?: ProjectContext, autoFix?: boolean, skipAnalyzed?: boolean, selectedRows?: Set<number>, reviewFixes?: boolean, columnMapping?: ColumnMapping): Promise<void> {
     if (this._isRunning) {
       vscode.window.showWarningMessage('Analysis is already running.');
@@ -212,7 +224,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    // 4. Validate Excel format (check columns)
+    // 4. Ensure project folder is in workspace (for diagnostics, file navigation, explorer)
+    await this._ensureWorkspaceFolder(projectFolder);
+
+    // 5. Validate Excel format (check columns)
     this._view?.webview.postMessage({ command: 'validating', message: 'Checking Excel format...' });
     let warningCount = 0;
     try {

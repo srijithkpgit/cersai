@@ -37,10 +37,11 @@ Step 4 - Functional and Security Impact Assessment: Evaluate the actual impact:
 - Consider edge cases: What happens with boundary values, NULL pointers, maximum array sizes, concurrent access, or unexpected input?
 - Consider platform-specific behavior: Could this behave differently on the target platform vs. a desktop system?${ctx.compiler ? `\n- Consider compiler-specific behavior: Does ${ctx.compiler} handle this construct in a non-standard or platform-specific way?` : ''}${ctx.rtos ? `\n- Consider RTOS context: In a ${ctx.rtos} environment, could this be called from an ISR, a different task priority, or a critical section?` : ''}
 
-Step 5 - Self-Challenge (Devil's Advocate): BEFORE deciding your priority, argue AGAINST your initial conclusion:
-- If you are leaning toward LOW_PRIO or FALSE_POSITIVE, list specific scenarios where this code COULD fail or cause harm. Consider: untested edge cases, future code changes that could break assumptions, interrupt handlers modifying shared state, multi-core race conditions, compiler optimizations changing behavior.
-- If you cannot find ANY realistic failure scenario, only then classify as LOW_PRIO or FALSE_POSITIVE.
-- If you find even ONE plausible failure scenario that isn't explicitly guarded against in the code, classify as HIGH_PRIO.
+Step 5 - Self-Challenge (Balanced Review): BEFORE deciding your priority, critically review your initial conclusion:
+- If you are leaning toward LOW_PRIO or FALSE_POSITIVE, consider whether there are realistic scenarios where this code could fail or cause harm in the actual deployment context.
+- A risk warrants HIGH_PRIO only when it is: (a) realistic and likely to occur in practice, (b) significant in impact (crash, UB, security issue, data corruption), and (c) not already mitigated by visible safeguards in the code.
+- Classify as LOW_PRIO when the warning is valid but the risk is unlikely, the impact is minimal, or the code context shows sufficient mitigation.
+- Classify as FALSE_POSITIVE when the warning is provably not applicable to this specific code.
 
 Step 6 - Recommend Action: Either provide a code fix with explanation, or provide a formal justification that the warning is non-critical/false positive. The justification must address every failure scenario from Step 5.${safetyNote}
 
@@ -48,8 +49,9 @@ CRITICAL RULES:
 - Do NOT dismiss a warning just because the code "looks correct" at first glance. Static analyzers flag real patterns of risk.
 - Do NOT assume variables are always in valid ranges unless you can see explicit validation in the provided code.
 - Do NOT assume functions always succeed unless error handling is visible.
-- When you lack information about callers, data flow, or initialization, assume the WORST CASE — classify as HIGH_PRIO.
-- Missing context is a reason to classify HIGH, not LOW. The static analyzer saw something you might be missing.
+- Evaluate the actual code context thoroughly. Consider visible safeguards, defensive coding patterns, and the realistic execution environment.
+- Use sound engineering judgment: distinguish between realistic risks that warrant action and purely theoretical risks that are extremely unlikely in the actual deployment context.
+- When context is missing, weigh the severity and likelihood of the potential issue rather than automatically escalating.
 
 IMPORTANT: You MUST respond in this exact JSON format and nothing else:
 {
@@ -217,7 +219,12 @@ Apply a highly defensive analysis approach. When in doubt, classify the warning 
       return `\n\n**Analysis Mode: RELAXED**
 Apply a lenient analysis approach. Focus only on warnings that represent clear, definite bugs or security vulnerabilities. If the code works correctly in the current context and the warning is about theoretical risks that are unlikely in this specific embedded system, classify it as LOW_PRIO or FALSE_POSITIVE. Only classify as HIGH_PRIO when there is a concrete, demonstrable bug or security issue. Give the developer the benefit of the doubt.`;
     default:
-      return '';
+      return `\n\n**Analysis Mode: NEUTRAL (Balanced)**
+Apply a balanced, engineering-judgment-based analysis:
+- HIGH_PRIO: The warning points to a likely real bug, security vulnerability, or undefined behavior that has a realistic chance of occurring and causing significant impact. A code fix is needed.
+- LOW_PRIO: The warning is valid and identifies a real pattern of concern, but the risk is low-likelihood, low-impact, or the code context shows sufficient mitigation (e.g., bounds checks, null guards, controlled inputs). Document why the risk is acceptable.
+- FALSE_POSITIVE: The warning is provably not applicable to this specific code — you can point to concrete evidence that makes the flagged concern impossible.
+Do not default to HIGH_PRIO out of caution alone. Use the evidence in the code to make a well-reasoned classification.`;
   }
 }
 
@@ -334,15 +341,16 @@ function extractResult(parsed: Record<string, unknown>): AnalysisResult {
   return result;
 }
 
-const CHALLENGER_PROMPT = `You are a senior code safety reviewer. Your SOLE JOB is to find reasons why a static analysis warning should NOT be dismissed.
+const CHALLENGER_PROMPT = `You are a senior code safety reviewer performing a verification review of a static analysis assessment.
 
-A previous analysis concluded that the following warning is non-critical. Your task is to CHALLENGE that conclusion.
+A previous analysis classified the following warning as non-critical (LOW_PRIO or FALSE_POSITIVE). Your task is to VERIFY that conclusion by assessing whether any significant, realistic risk was overlooked.
 
 Specifically:
-1. List every possible scenario where this code could fail, crash, produce wrong results, or cause undefined behavior.
-2. For each scenario, explain whether the code explicitly guards against it (with evidence from the provided code).
-3. Consider: interrupt context, multi-core access, compiler reordering, boundary values, NULL/uninitialized state, type promotion issues, signed/unsigned mismatches, buffer sizes, stack overflow, hardware register volatility.
-4. If the previous analysis made ANY assumptions that are not provable from the provided code alone, the warning should be upgraded to HIGH_PRIO.
+1. Review the previous analysis reasoning for gaps or incorrect assumptions.
+2. Identify realistic failure scenarios: interrupt context, multi-core access, compiler reordering, boundary values, NULL/uninitialized state, type promotion issues, signed/unsigned mismatches, buffer sizes.
+3. For each scenario, assess: (a) likelihood of occurrence in practice, (b) whether the code has visible mitigations, and (c) severity of impact if it does occur.
+4. Upgrade to HIGH_PRIO ONLY if you find a SUBSTANTIAL and REALISTIC risk that is both significant in impact AND not mitigated by visible safeguards in the code.
+5. Do NOT upgrade based on purely theoretical risks, extremely unlikely edge cases, or speculative scenarios that require unrealistic conditions.
 
 Respond with ONLY a valid JSON object:
 {
@@ -352,7 +360,7 @@ Respond with ONLY a valid JSON object:
   "fixNewCode": "corrected code (only if shouldUpgrade is true)"
 }
 
-Set shouldUpgrade to true if you find ANY realistic risk that is not explicitly handled in the code.`;
+Set shouldUpgrade to true ONLY for substantial, realistic, unmitigated risks with significant impact.`;
 
 /**
  * Challenge a non-HIGH analysis result with a second adversarial pass.

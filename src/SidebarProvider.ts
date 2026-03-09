@@ -57,10 +57,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           const colMapping: ColumnMapping | undefined = (message.columnMapping?.message && message.columnMapping?.path)
             ? message.columnMapping as ColumnMapping
             : undefined;
+          const pathFilter: string = (message.pathFilter || '').trim();
           if (message.manualSelect) {
-            await this._startWithManualSelection(message.excelPath, message.projectFolder, message.defensiveness, ctx, message.autoFix, message.skipAnalyzed, message.reviewFixes, colMapping);
+            await this._startWithManualSelection(message.excelPath, message.projectFolder, message.defensiveness, ctx, message.autoFix, message.skipAnalyzed, message.reviewFixes, colMapping, pathFilter);
           } else {
-            await this._startAnalysis(message.excelPath, message.projectFolder, message.defensiveness, ctx, message.autoFix, message.skipAnalyzed, undefined, message.reviewFixes, colMapping);
+            await this._startAnalysis(message.excelPath, message.projectFolder, message.defensiveness, ctx, message.autoFix, message.skipAnalyzed, undefined, message.reviewFixes, colMapping, pathFilter);
           }
           break;
         }
@@ -189,7 +190,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     vscode.workspace.updateWorkspaceFolders(folders.length, 0, { uri: folderUri });
   }
 
-  private async _startAnalysis(excelPath: string, projectFolder: string, defensiveness?: string, projectContext?: ProjectContext, autoFix?: boolean, skipAnalyzed?: boolean, selectedRows?: Set<number>, reviewFixes?: boolean, columnMapping?: ColumnMapping): Promise<void> {
+  private async _startAnalysis(excelPath: string, projectFolder: string, defensiveness?: string, projectContext?: ProjectContext, autoFix?: boolean, skipAnalyzed?: boolean, selectedRows?: Set<number>, reviewFixes?: boolean, columnMapping?: ColumnMapping, pathFilter?: string): Promise<void> {
     if (this._isRunning) {
       vscode.window.showWarningMessage('Analysis is already running.');
       return;
@@ -284,6 +285,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       autoFix: !!autoFix,
       reviewFixes: !!reviewFixes,
       skipAnalyzed: skipAnalyzed !== false,
+      pathFilter: pathFilter || '',
       columnMapping,
     });
 
@@ -327,6 +329,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         doReviewFixes,
         true, // Always verify non-critical results with challenger pass
         columnMapping,
+        pathFilter,
         // Progress callback
         (current, total, message) => {
           this._view?.webview.postMessage({
@@ -447,7 +450,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     autoFix?: boolean,
     skipAnalyzed?: boolean,
     reviewFixes?: boolean,
-    columnMapping?: ColumnMapping
+    columnMapping?: ColumnMapping,
+    pathFilter?: string
   ): Promise<void> {
     if (!excelPath) {
       this._sendError('Please select an Excel file first.');
@@ -521,7 +525,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    await this._startAnalysis(excelPath, projectFolder, defensiveness, projectContext, autoFix, skipAnalyzed, matchingRows, reviewFixes, columnMapping);
+    await this._startAnalysis(excelPath, projectFolder, defensiveness, projectContext, autoFix, skipAnalyzed, matchingRows, reviewFixes, columnMapping, pathFilter);
   }
 
   private async _reviewPendingFixes(projectRoot: string, excelPath: string): Promise<void> {
@@ -775,6 +779,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       <div class="field">
         <span class="field-label">Project Notes</span>
         <textarea id="projectNotesInput" class="text-input text-area" placeholder="e.g. No dynamic allocation, ISRs are masked during critical sections, all pointers validated at API boundary" rows="3"></textarea>
+      </div>
+      <div class="field">
+        <span class="field-label">Path Filter</span>
+        <input type="text" id="pathFilterInput" class="text-input" placeholder="e.g. src/app, /safety/, module_name" value="">
       </div>
       <div class="options-group">
         <label class="checkbox-label">

@@ -16,6 +16,7 @@ export interface ProjectConfig {
   reviewFixes?: boolean;
   skipAnalyzed?: boolean;
   manualSelect?: boolean;
+  pathFilter?: string;
   columnMapping?: ColumnMapping;
 }
 

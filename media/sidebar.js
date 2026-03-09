@@ -30,6 +30,7 @@
   const rtosInput = document.getElementById('rtosInput');
   const safetyStandardInput = document.getElementById('safetyStandardInput');
   const projectNotesInput = document.getElementById('projectNotesInput');
+  const pathFilterInput = document.getElementById('pathFilterInput');
   const exportSection = document.getElementById('exportSection');
   const btnExport = document.getElementById('btnExport');
 
@@ -136,6 +137,7 @@
       skipAnalyzed: skipAnalyzedCheckbox.checked,
       manualSelect: manualSelectCheckbox.checked,
       reviewFixes: reviewFixesCheckbox.checked,
+      pathFilter: pathFilterInput.value.trim(),
       columnMapping: getColumnMapping(),
     });
   });
@@ -271,6 +273,7 @@
         rtosInput.disabled = true;
         safetyStandardInput.disabled = true;
         projectNotesInput.disabled = true;
+        pathFilterInput.disabled = true;
         autoFixCheckbox.disabled = true;
         skipAnalyzedCheckbox.disabled = true;
         manualSelectCheckbox.disabled = true;
@@ -327,6 +330,7 @@
         rtosInput.disabled = false;
         safetyStandardInput.disabled = false;
         projectNotesInput.disabled = false;
+        pathFilterInput.disabled = false;
         autoFixCheckbox.disabled = false;
         skipAnalyzedCheckbox.disabled = false;
         manualSelectCheckbox.disabled = false;
@@ -363,6 +367,7 @@
         rtosInput.disabled = false;
         safetyStandardInput.disabled = false;
         projectNotesInput.disabled = false;
+        pathFilterInput.disabled = false;
         autoFixCheckbox.disabled = false;
         skipAnalyzedCheckbox.disabled = false;
         manualSelectCheckbox.disabled = false;
@@ -402,6 +407,7 @@
           if (c.projectNotes !== undefined) { projectNotesInput.value = c.projectNotes; }
           if (c.reviewFixes !== undefined) { reviewFixesCheckbox.checked = c.reviewFixes; }
           if (c.skipAnalyzed !== undefined) { skipAnalyzedCheckbox.checked = c.skipAnalyzed; }
+          if (c.pathFilter !== undefined) { pathFilterInput.value = c.pathFilter; }
           if (c.columnMapping) { savedColumnMapping = c.columnMapping; }
           updateStartButton();
         }
@@ -424,6 +430,7 @@
             skipAnalyzed: skipAnalyzedCheckbox.checked,
             manualSelect: manualSelectCheckbox.checked,
             reviewFixes: reviewFixesCheckbox.checked,
+            pathFilter: pathFilterInput.value.trim(),
             columnMapping: getColumnMapping(),
           });
         }

@@ -30,6 +30,7 @@ export async function runAnalysis(
   reviewFixes: boolean,
   verifyResults: boolean,
   columnMapping: ColumnMapping | undefined,
+  pathFilter: string | undefined,
   onProgress: ProgressCallback,
   onResult: ResultCallback,
   cancellationToken: vscode.CancellationToken
@@ -39,6 +40,12 @@ export async function runAnalysis(
   let filtered = allWarnings;
   if (selectedRows && selectedRows.size > 0) {
     filtered = allWarnings.filter(w => selectedRows.has(w.rowNumber));
+  }
+
+  // Apply path filter — case-insensitive substring match
+  if (pathFilter && pathFilter.length > 0) {
+    const filterLower = pathFilter.toLowerCase();
+    filtered = filtered.filter(w => w.filePath.toLowerCase().includes(filterLower));
   }
 
   const skippedCount = skipAnalyzed

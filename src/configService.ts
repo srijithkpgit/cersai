@@ -17,6 +17,7 @@ export interface ProjectConfig {
   skipAnalyzed?: boolean;
   manualSelect?: boolean;
   pathFilter?: string;
+  analyserName?: string;
   columnMapping?: ColumnMapping;
 }
 

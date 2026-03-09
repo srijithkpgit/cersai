@@ -34,14 +34,21 @@
   const exportSection = document.getElementById('exportSection');
   const btnExport = document.getElementById('btnExport');
 
-  // Column mapping elements
+  // Column mapping elements — input
   const columnMappingSection = document.getElementById('columnMappingSection');
   const mapMessage = document.getElementById('mapMessage');
   const mapPath = document.getElementById('mapPath');
   const mapLineInCode = document.getElementById('mapLineInCode');
   const mapColumn = document.getElementById('mapColumn');
   const mapCodeLine = document.getElementById('mapCodeLine');
-  const mappingSelects = [mapMessage, mapPath, mapLineInCode, mapColumn, mapCodeLine];
+  // Column mapping elements — output
+  const mapAnalyser = document.getElementById('mapAnalyser');
+  const mapResults = document.getElementById('mapResults');
+  const mapReasoning = document.getElementById('mapReasoning');
+  const mappingSelects = [mapMessage, mapPath, mapLineInCode, mapColumn, mapCodeLine, mapAnalyser, mapResults, mapReasoning];
+
+  // Analyser name
+  const analyserNameInput = document.getElementById('analyserNameInput');
 
   // Synonym map for auto-detection
   const synonyms = {
@@ -50,6 +57,9 @@
     lineInCode: ['line-in-code', 'line', 'lineincode', 'linenumber', 'line number', 'line_number', 'lineno', 'line no'],
     column: ['column', 'col', 'columnno', 'column number', 'col_number'],
     codeLine: ['code-line', 'code', 'codeline', 'code line', 'source line', 'sourceline', 'source_line', 'code_line'],
+    analyser: ['analyser', 'analyzer', 'analysed by', 'analyzed by', 'tool', 'reviewed by'],
+    results: ['results', 'result', 'priority', 'classification', 'severity', 'verdict'],
+    reasoning: ['reasoning', 'reason', 'comment', 'justification', 'explanation', 'rationale', 'notes'],
   };
 
   function getColumnMapping() {
@@ -59,7 +69,12 @@
     const c = mapColumn.value;
     const cl = mapCodeLine.value;
     if (m && p && l && c && cl) {
-      return { message: m, path: p, lineInCode: l, column: c, codeLine: cl };
+      const mapping = { message: m, path: p, lineInCode: l, column: c, codeLine: cl };
+      // Output columns are optional
+      if (mapAnalyser.value) { mapping.analyser = mapAnalyser.value; }
+      if (mapResults.value) { mapping.results = mapResults.value; }
+      if (mapReasoning.value) { mapping.reasoning = mapReasoning.value; }
+      return mapping;
     }
     return null;
   }
@@ -138,6 +153,7 @@
       manualSelect: manualSelectCheckbox.checked,
       reviewFixes: reviewFixesCheckbox.checked,
       pathFilter: pathFilterInput.value.trim(),
+      analyserName: analyserNameInput.value.trim(),
       columnMapping: getColumnMapping(),
     });
   });
@@ -274,6 +290,7 @@
         safetyStandardInput.disabled = true;
         projectNotesInput.disabled = true;
         pathFilterInput.disabled = true;
+        analyserNameInput.disabled = true;
         autoFixCheckbox.disabled = true;
         skipAnalyzedCheckbox.disabled = true;
         manualSelectCheckbox.disabled = true;
@@ -331,6 +348,7 @@
         safetyStandardInput.disabled = false;
         projectNotesInput.disabled = false;
         pathFilterInput.disabled = false;
+        analyserNameInput.disabled = false;
         autoFixCheckbox.disabled = false;
         skipAnalyzedCheckbox.disabled = false;
         manualSelectCheckbox.disabled = false;
@@ -368,6 +386,7 @@
         safetyStandardInput.disabled = false;
         projectNotesInput.disabled = false;
         pathFilterInput.disabled = false;
+        analyserNameInput.disabled = false;
         autoFixCheckbox.disabled = false;
         skipAnalyzedCheckbox.disabled = false;
         manualSelectCheckbox.disabled = false;
@@ -408,6 +427,7 @@
           if (c.reviewFixes !== undefined) { reviewFixesCheckbox.checked = c.reviewFixes; }
           if (c.skipAnalyzed !== undefined) { skipAnalyzedCheckbox.checked = c.skipAnalyzed; }
           if (c.pathFilter !== undefined) { pathFilterInput.value = c.pathFilter; }
+          if (c.analyserName !== undefined) { analyserNameInput.value = c.analyserName; }
           if (c.columnMapping) { savedColumnMapping = c.columnMapping; }
           updateStartButton();
         }
@@ -431,6 +451,7 @@
             manualSelect: manualSelectCheckbox.checked,
             reviewFixes: reviewFixesCheckbox.checked,
             pathFilter: pathFilterInput.value.trim(),
+            analyserName: analyserNameInput.value.trim(),
             columnMapping: getColumnMapping(),
           });
         }

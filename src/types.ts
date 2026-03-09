@@ -27,11 +27,16 @@ export interface ProjectContext {
 }
 
 export interface ColumnMapping {
+  // Input columns
   message: string;
   path: string;
   lineInCode: string;
   column: string;
   codeLine: string;
+  // Output columns (optional — falls back to defaults)
+  analyser?: string;
+  results?: string;
+  reasoning?: string;
 }
 
 export type ProgressCallback = (current: number, total: number, message: string) => void;

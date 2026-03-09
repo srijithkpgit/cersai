@@ -58,10 +58,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             ? message.columnMapping as ColumnMapping
             : undefined;
           const pathFilter: string = (message.pathFilter || '').trim();
+          const analyserName: string = (message.analyserName || '').trim();
           if (message.manualSelect) {
-            await this._startWithManualSelection(message.excelPath, message.projectFolder, message.defensiveness, ctx, message.autoFix, message.skipAnalyzed, message.reviewFixes, colMapping, pathFilter);
+            await this._startWithManualSelection(message.excelPath, message.projectFolder, message.defensiveness, ctx, message.autoFix, message.skipAnalyzed, message.reviewFixes, colMapping, pathFilter, analyserName);
           } else {
-            await this._startAnalysis(message.excelPath, message.projectFolder, message.defensiveness, ctx, message.autoFix, message.skipAnalyzed, undefined, message.reviewFixes, colMapping, pathFilter);
+            await this._startAnalysis(message.excelPath, message.projectFolder, message.defensiveness, ctx, message.autoFix, message.skipAnalyzed, undefined, message.reviewFixes, colMapping, pathFilter, analyserName);
           }
           break;
         }
@@ -190,7 +191,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     vscode.workspace.updateWorkspaceFolders(folders.length, 0, { uri: folderUri });
   }
 
-  private async _startAnalysis(excelPath: string, projectFolder: string, defensiveness?: string, projectContext?: ProjectContext, autoFix?: boolean, skipAnalyzed?: boolean, selectedRows?: Set<number>, reviewFixes?: boolean, columnMapping?: ColumnMapping, pathFilter?: string): Promise<void> {
+  private async _startAnalysis(excelPath: string, projectFolder: string, defensiveness?: string, projectContext?: ProjectContext, autoFix?: boolean, skipAnalyzed?: boolean, selectedRows?: Set<number>, reviewFixes?: boolean, columnMapping?: ColumnMapping, pathFilter?: string, analyserName?: string): Promise<void> {
     if (this._isRunning) {
       vscode.window.showWarningMessage('Analysis is already running.');
       return;
@@ -286,6 +287,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       reviewFixes: !!reviewFixes,
       skipAnalyzed: skipAnalyzed !== false,
       pathFilter: pathFilter || '',
+      analyserName: analyserName || '',
       columnMapping,
     });
 
@@ -330,6 +332,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         true, // Always verify non-critical results with challenger pass
         columnMapping,
         pathFilter,
+        analyserName,
         // Progress callback
         (current, total, message) => {
           this._view?.webview.postMessage({
@@ -451,7 +454,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     skipAnalyzed?: boolean,
     reviewFixes?: boolean,
     columnMapping?: ColumnMapping,
-    pathFilter?: string
+    pathFilter?: string,
+    analyserName?: string
   ): Promise<void> {
     if (!excelPath) {
       this._sendError('Please select an Excel file first.');
@@ -525,7 +529,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    await this._startAnalysis(excelPath, projectFolder, defensiveness, projectContext, autoFix, skipAnalyzed, matchingRows, reviewFixes, columnMapping, pathFilter);
+    await this._startAnalysis(excelPath, projectFolder, defensiveness, projectContext, autoFix, skipAnalyzed, matchingRows, reviewFixes, columnMapping, pathFilter, analyserName);
   }
 
   private async _reviewPendingFixes(projectRoot: string, excelPath: string): Promise<void> {
@@ -744,6 +748,19 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         <span class="mapping-label">Code Line</span>
         <select id="mapCodeLine" class="select-input"><option value="">-- select column --</option></select>
       </div>
+      <div class="section-title" style="margin-top:8px;">Output Columns</div>
+      <div class="mapping-field">
+        <span class="mapping-label">Analyser</span>
+        <select id="mapAnalyser" class="select-input"><option value="">-- select column --</option></select>
+      </div>
+      <div class="mapping-field">
+        <span class="mapping-label">Results</span>
+        <select id="mapResults" class="select-input"><option value="">-- select column --</option></select>
+      </div>
+      <div class="mapping-field">
+        <span class="mapping-label">Reasoning</span>
+        <select id="mapReasoning" class="select-input"><option value="">-- select column --</option></select>
+      </div>
     </div>
 
     <!-- Settings -->
@@ -783,6 +800,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       <div class="field">
         <span class="field-label">Path Filter</span>
         <input type="text" id="pathFilterInput" class="text-input" placeholder="e.g. src/app, /safety/, module_name" value="">
+      </div>
+      <div class="field">
+        <span class="field-label">Analyser Name</span>
+        <input type="text" id="analyserNameInput" class="text-input" placeholder="e.g. Cersai AI, Team Name" value="">
       </div>
       <div class="options-group">
         <label class="checkbox-label">

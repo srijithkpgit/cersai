@@ -10,6 +10,7 @@ interface ColumnMap {
   comment: number;
   priority: number;
   fixApplied: number;
+  analyser: number;
 }
 
 export async function readHeaders(filePath: string): Promise<string[]> {
@@ -54,10 +55,15 @@ function buildColumnMap(worksheet: ExcelJS.Worksheet, mapping?: ColumnMapping): 
     map.codeLine = headerIndex.get('code-line');
   }
 
-  // Always detect output columns by name
-  map.comment = headerIndex.get('comment');
-  map.priority = headerIndex.get('priority');
+  // Output columns: use mapping if provided, else detect by default names
+  const reasoningName = mapping?.reasoning?.toLowerCase();
+  const resultsName = mapping?.results?.toLowerCase();
+  const analyserName = mapping?.analyser?.toLowerCase();
+
+  map.comment = (reasoningName && headerIndex.get(reasoningName)) || headerIndex.get('comment');
+  map.priority = (resultsName && headerIndex.get(resultsName)) || headerIndex.get('priority');
   map.fixApplied = headerIndex.get('fixapplied');
+  map.analyser = (analyserName && headerIndex.get(analyserName)) || headerIndex.get('analyser') || headerIndex.get('analyzer');
 
   // Validate required columns
   const missing: string[] = [];
@@ -71,17 +77,17 @@ function buildColumnMap(worksheet: ExcelJS.Worksheet, mapping?: ColumnMapping): 
     throw new Error(`Missing required columns in Excel: ${missing.join(', ')}`);
   }
 
-  // Create Comment column if not found
+  // Create Comment/Reasoning column if not found
   if (!map.comment) {
     const lastCol = worksheet.columnCount + 1;
-    headerRow.getCell(lastCol).value = 'Comment';
+    headerRow.getCell(lastCol).value = mapping?.reasoning || 'Comment';
     map.comment = lastCol;
   }
 
-  // Create Priority column if not found (column M = 13, but use dynamic)
+  // Create Priority/Results column if not found
   if (!map.priority) {
     const lastCol = worksheet.columnCount + 1;
-    headerRow.getCell(lastCol).value = 'Priority';
+    headerRow.getCell(lastCol).value = mapping?.results || 'Priority';
     map.priority = lastCol;
   }
 
@@ -90,6 +96,13 @@ function buildColumnMap(worksheet: ExcelJS.Worksheet, mapping?: ColumnMapping): 
     const lastCol = worksheet.columnCount + 1;
     headerRow.getCell(lastCol).value = 'FixApplied';
     map.fixApplied = lastCol;
+  }
+
+  // Create Analyser column if not found and an analyser mapping was specified
+  if (!map.analyser && mapping?.analyser) {
+    const lastCol = worksheet.columnCount + 1;
+    headerRow.getCell(lastCol).value = mapping.analyser;
+    map.analyser = lastCol;
   }
 
   return map as ColumnMap;
@@ -131,7 +144,8 @@ export async function writeResult(
   filePath: string,
   rowNumber: number,
   result: AnalysisResult,
-  columnMapping?: ColumnMapping
+  columnMapping?: ColumnMapping,
+  analyserName?: string
 ): Promise<void> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(filePath);
@@ -147,6 +161,9 @@ export async function writeResult(
   row.getCell(colMap.priority).value = result.priority;
   row.getCell(colMap.comment).value = result.comment;
   row.getCell(colMap.fixApplied).value = result.fixApplied ? 'YES' : '';
+  if (colMap.analyser && analyserName) {
+    row.getCell(colMap.analyser).value = analyserName;
+  }
   row.commit();
 
   await workbook.xlsx.writeFile(filePath);

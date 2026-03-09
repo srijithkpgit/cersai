@@ -31,6 +31,7 @@ export async function runAnalysis(
   verifyResults: boolean,
   columnMapping: ColumnMapping | undefined,
   pathFilter: string | undefined,
+  analyserName: string | undefined,
   onProgress: ProgressCallback,
   onResult: ResultCallback,
   cancellationToken: vscode.CancellationToken
@@ -148,7 +149,7 @@ export async function runAnalysis(
       }
 
       // Step 5: Write result to Excel (serialized via queue)
-      enqueueWrite(() => writeResult(excelPath, warning.rowNumber, result, columnMapping));
+      enqueueWrite(() => writeResult(excelPath, warning.rowNumber, result, columnMapping, analyserName));
 
       // Update summary
       summary.analyzed++;
